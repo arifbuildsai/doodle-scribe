@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Storyboard — Why the Sky Is Blue (Whiteboard Explainer)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Permanent+Marker&display=block">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #17191d; color: #e8e6e0; font-family: "Kalam", cursive; padding: 28px 34px 60px; }
+  h1 { font-family: "Permanent Marker", cursive; font-weight: 400; font-size: 40px; margin: 0 0 4px; color: #fff; }
+  h1 .blue { color: #7fa3ff; } h1 .red { color: #ff7a72; }
+  .meta { font-size: 17px; color: #a9adb6; margin-bottom: 26px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 26px; }
+  .card { background: #22252b; border: 1px solid #33373f; border-radius: 12px; padding: 14px 16px 16px; }
+  .card canvas { width: 100%; border-radius: 6px; display: block; background: #dfe4e3; box-shadow: 0 4px 18px rgba(0,0,0,.45); }
+  .beatline { font-family: "Permanent Marker", cursive; font-size: 21px; margin: 10px 0 2px; color: #ffd75e; }
+  .beatline b { color: #fff; font-weight: 400; }
+  .row { font-size: 15.5px; line-height: 1.45; margin: 5px 0 0; color: #c9ccd3; }
+  .row b { color: #e8e6e0; font-weight: 700; }
+  .say { color: #9aa0ab; font-style: italic; }
+  h2 { font-family: "Permanent Marker", cursive; font-weight: 400; font-size: 28px; margin: 40px 0 10px; color: #ffd75e; }
+  ul.assum { font-size: 16px; line-height: 1.55; max-width: 1000px; color: #c9ccd3; }
+  ul.assum li { margin-bottom: 7px; }
+</style>
+</head>
+<body>
+<h1>Why the Sky Is Blue — <span class="blue">Whiteboard Explainer</span> storyboard</h1>
+<div class="meta">
+  Style: dry-erase marker on a glossy whiteboard (reference technique: streaky chisel-tip <code>marker()</code> strokes with pooled edges,
+  letter-by-letter <code>mText()</code>, ghost residue of erased lessons, ceiling-light sheen, grain). 8 beats · 1280×720 · DURATION 31.6&nbsp;s.<br>
+  Voiceover: attached <code>VO.wav</code> (30.61&nbsp;s). Every reveal is keyed to the word-level timestamps in <code>WORDS.tsv</code>, so a label lands on the word it illustrates.
+  Panels below are stills rendered by the exact <code>drawFrame(t)</code> the final animation will use.
+</div>
+<div class="grid" id="grid"></div>
+<h2>Assumptions I had to make</h2>
+<ul class="assum" id="assum"></ul>
+
+<script>
+// ================= H helper library (unchanged) =================
+(function () {
+  const H = (window.H = {});
+  H.rng = function (seed = 1) {
+    let a = typeof seed === 'string' ? hashStr(seed) : (seed >>> 0) || 1;
+    const r = function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    r.range = (lo, hi) => lo + r() * (hi - lo);
+    r.int = (lo, hi) => Math.floor(lo + r() * (hi - lo + 1));
+    r.pick = (arr) => arr[Math.floor(r() * arr.length)];
+    r.chance = (p) => r() < p;
+    r.gauss = () => { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    return r;
+  };
+  function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  H.makeNoise = function (seed = 1) {
+    const r = H.rng(seed), p = new Uint8Array(512), perm = [...Array(256).keys()];
+    for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+    for (let i = 0; i < 512; i++) p[i] = perm[i & 255];
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const g3 = (h, x, y, z) => { h &= 15; const u = h < 8 ? x : y, v = h < 4 ? y : h === 12 || h === 14 ? x : z; return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); };
+    function n3(x, y, z) {
+      const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+      x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+      const u = fade(x), v = fade(y), w = fade(z);
+      const A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z, B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+      return lerp(lerp(lerp(g3(p[AA], x, y, z), g3(p[BA], x - 1, y, z), u), lerp(g3(p[AB], x, y - 1, z), g3(p[BB], x - 1, y - 1, z), u), v),
+        lerp(lerp(g3(p[AA + 1], x, y, z - 1), g3(p[BA + 1], x - 1, y, z - 1), u), lerp(g3(p[AB + 1], x, y - 1, z - 1), g3(p[BB + 1], x - 1, y - 1, z - 1), u), v), w);
+    }
+    const n2 = (x, y) => n3(x, y, 0.5);
+    const fbm3 = (x, y, z, oct = 4) => { let s = 0, a = 0.5, f = 1, norm = 0; for (let i = 0; i < oct; i++) { s += a * n3(x * f, y * f, z * f); norm += a; a *= 0.5; f *= 2; } return s / norm; };
+    const fbm2 = (x, y, oct = 4) => fbm3(x, y, 0.5, oct);
+    return { n2, n3, fbm2, fbm3 };
+  };
+  H.lerp = (a, b, t) => a + (b - a) * t;
+  H.clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+  H.map = (v, a, b, c, d) => c + ((v - a) / (b - a)) * (d - c);
+  H.smooth = (e0, e1, x) => { const t = H.clamp((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
+  H.hex = (h) => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join(''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  H.rgba = (hexOrArr, a = 1) => { const [r, g, b] = Array.isArray(hexOrArr) ? hexOrArr : H.hex(hexOrArr); return `rgba(${r | 0},${g | 0},${b | 0},${a})`; };
+  H.mix = (c1, c2, t) => { const a = Array.isArray(c1) ? c1 : H.hex(c1), b = Array.isArray(c2) ? c2 : H.hex(c2); return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t); };
+  H.layer = (W, H_) => { const c = document.createElement('canvas'); c.width = W; c.height = H_; return c; };
+  H.grain = function (ctx, W, Hh, amount = 0.08, seed = 7, mono = true) {
+    const img = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height), d = img.data, r = H.rng(seed), k = amount * 255;
+    for (let i = 0; i < d.length; i += 4) {
+      const n = (r() - 0.5) * k;
+      if (mono) { d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+      else { d[i] += (r() - 0.5) * k; d[i + 1] += (r() - 0.5) * k; d[i + 2] += (r() - 0.5) * k; }
+    }
+    ctx.putImageData(img, 0, 0);
+  };
+})();
+
+// ================= whiteboard drawing technique (copied from the reference) =================
+(function () {
+  const seg = (pts, step = 2.5) => {
+    const out = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / step));
+      for (let j = 0; j < n; j++) out.push([x0 + (x1 - x0) * j / n, y0 + (y1 - y0) * j / n]);
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  };
+  const normals = (P) => P.map((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    return [-dy / d, dx / d];
+  });
+  const wobble = (pts, nz, seed, amp = 1.6, freq = 0.011) => {
+    const N = normals(pts); let L = 0;
+    return pts.map((p, i) => {
+      if (i) L += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]);
+      const o = nz.n2(L * freq + seed * 1.37, seed * 0.71) * amp + nz.n2(L * freq * 6 + seed, seed + 3.3) * amp * 0.25;
+      return [p[0] + N[i][0] * o, p[1] + N[i][1] * o];
+    });
+  };
+  const ell = (cx, cy, rx, ry, a0 = 0, a1 = Math.PI * 2, grow = 0) => {
+    const n = Math.max(10, Math.ceil(Math.abs(a1 - a0) * Math.max(rx, ry) / 2.5)), out = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, a = a0 + (a1 - a0) * u, g = 1 + grow * u;
+      out.push([cx + Math.cos(a) * rx * g, cy + Math.sin(a) * ry * g]);
+    }
+    return out;
+  };
+  const bez = (p0, p1, p2, p3) => {
+    const out = [];
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60, m = 1 - t;
+      out.push([m * m * m * p0[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t * t * t * p3[0],
+        m * m * m * p0[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t * t * t * p3[1]]);
+    }
+    return out;
+  };
+  const tracePath = (ctx, P) => { ctx.beginPath(); P.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); };
+
+  const BOARD = [236, 240, 239];
+  const MN = H.makeNoise(4242);
+
+  const marker = (ctx, pts, col, w, seed, prog = 1) => {
+    if (prog <= 0) return;
+    const P = prog < 1 ? pts.slice(0, Math.max(2, Math.ceil(pts.length * prog))) : pts;
+    const r = H.rng(seed), rgb = H.hex(col), N = normals(P);
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = H.rgba(rgb, 0.3); ctx.lineWidth = w; tracePath(ctx, P); ctx.stroke();
+    ctx.lineCap = 'butt';
+    const CH = 10;
+    for (let i = 0; i < P.length - 1; i += CH) {
+      const a = 0.16 + 0.22 * (0.5 + 0.5 * MN.n2(i * 0.03 + seed * 3.1, seed * 0.37));
+      ctx.strokeStyle = H.rgba(rgb, a); ctx.lineWidth = w * 0.96;
+      ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]);
+      for (let j = i + 1; j <= Math.min(P.length - 1, i + CH); j++) ctx.lineTo(P[j][0], P[j][1]);
+      ctx.stroke();
+    }
+    const n = 7;
+    for (let k = 0; k < n; k++) {
+      const u = k / (n - 1) - 0.5, edge = Math.abs(u) * 2;
+      const a = (0.08 + 0.5 * Math.pow(edge, 2.2)) * (0.65 + r() * 0.7);
+      ctx.strokeStyle = H.rgba(rgb, a); ctx.lineWidth = (w / n) * 1.5;
+      const off = u * w * 0.84;
+      ctx.beginPath();
+      P.forEach((p, i) => { const x = p[0] + N[i][0] * off, y = p[1] + N[i][1] * off; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.stroke();
+    }
+    for (let k = 0; k < 4; k++) {
+      const off = (r() - 0.5) * w * 0.6;
+      ctx.strokeStyle = H.rgba(BOARD, 0.14 + r() * 0.2); ctx.lineWidth = 0.6 + r() * 0.6;
+      const s = Math.floor(r() * P.length * 0.4), e = Math.min(P.length, s + Math.floor(P.length * (0.3 + r() * 0.6)));
+      ctx.beginPath();
+      for (let i = s; i < e; i++) { const x = P[i][0] + N[i][0] * off, y = P[i][1] + N[i][1] * off; i > s ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+    [P[0], prog >= 1 ? P[P.length - 1] : null].forEach((p, j) => {
+      if (!p) return;
+      const g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], w * 0.62);
+      g.addColorStop(0, H.rgba(rgb, j ? 0.25 : 0.42)); g.addColorStop(1, H.rgba(rgb, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], w * 0.62, 0, 7); ctx.fill();
+    });
+    ctx.restore();
+  };
+
+  const mText = (ctx, str, x, y, font, col, seed, prog = 1, rot = 0) => {
+    if (prog <= 0) return;
+    const r = H.rng(seed), rgb = H.hex(col);
+    ctx.save(); ctx.font = font; ctx.textBaseline = 'alphabetic';
+    ctx.translate(x, y); ctx.rotate(rot);
+    const nChars = Math.ceil(str.length * prog);
+    let cx = 0;
+    for (let i = 0; i < nChars; i++) {
+      const ch = str[i], wch = ctx.measureText(ch).width;
+      ctx.save(); ctx.translate(cx + wch / 2, (r() - 0.5) * 3); ctx.rotate((r() - 0.5) * 0.07);
+      ctx.fillStyle = H.rgba(rgb, 0.8 + r() * 0.1); ctx.fillText(ch, -wch / 2, 0);
+      ctx.strokeStyle = H.rgba(rgb, 0.7); ctx.lineWidth = 1.3; ctx.strokeText(ch, -wch / 2, 0);
+      ctx.restore();
+      cx += wch + (r() - 0.5) * 1.5;
+    }
+    ctx.restore();
+  };
+
+  // ---- XE-lite: timing / camera / shape helpers (from the reference engine) ----
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const win = (t, a, b) => clamp((t - a) / (b - a));
+  const eio = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const camAt = (keys, t) => {
+    if (t <= keys[0][0]) return keys[0].slice(1);
+    for (let i = 0; i < keys.length - 1; i++) {
+      const a = keys[i], b = keys[i + 1];
+      if (t <= b[0]) {
+        const u = eio((t - a[0]) / Math.max(1e-6, b[0] - a[0]));
+        return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, Math.exp(Math.log(a[3]) + (Math.log(b[3]) - Math.log(a[3])) * u)];
+      }
+    }
+    return keys[keys.length - 1].slice(1);
+  };
+  const circ = (x, y, rx, ry, a0 = 0, a1 = Math.PI * 2, n = 0) => {
+    n = n || Math.max(12, Math.ceil(Math.abs(a1 - a0) * Math.max(rx, ry) / 6)); const o = [];
+    for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push([x + Math.cos(a) * rx, y + Math.sin(a) * ry]); }
+    return o;
+  };
+  const cubic = (p0, p1, p2, p3, n = 40) => { const o = []; for (let i = 0; i <= n; i++) { const t = i / n, m = 1 - t; o.push([m * m * m * p0[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t * t * t * p3[0], m * m * m * p0[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t * t * t * p3[1]]); } return o; };
+  const rrect = (x, y, w, h, r) => {
+    const o = [[x + r, y], [x + w - r, y]]; o.push(...circ(x + w - r, y + r, r, r, -Math.PI / 2, 0, 5).slice(1));
+    o.push([x + w, y + h - r]); o.push(...circ(x + w - r, y + h - r, r, r, 0, Math.PI / 2, 5).slice(1));
+    o.push([x + r, y + h]); o.push(...circ(x + r, y + h - r, r, r, Math.PI / 2, Math.PI, 5).slice(1));
+    o.push([x, y + r]); o.push(...circ(x + r, y + r, r, r, Math.PI, Math.PI * 1.5, 5).slice(1));
+    o.push([x + r + 6, y - 1]); return o;
+  };
+  const head = (P, len = 20, spread = 0.5) => {
+    const a = P[P.length - 1], b = P[Math.max(0, P.length - 4)], an = Math.atan2(a[1] - b[1], a[0] - b[0]);
+    return [[a[0] - Math.cos(an - spread) * len, a[1] - Math.sin(an - spread) * len], a, [a[0] - Math.cos(an + spread) * len, a[1] - Math.sin(an + spread) * len]];
+  };
+
+  // ================= the story: "Why the sky is blue" =================
+  // Palette (marker colors): ink, blue, red, green, orange, yellow, violet
+  const COLS = { ink: '#1d1f26', blue: '#1f4fc2', red: '#d4262f', green: '#16884a', orange: '#e0761c', yellow: '#c9970f', violet: '#7040b8' };
+  const FONTF = { title: '"Permanent Marker"', label: '"Kalam"', num: '"Permanent Marker"' };
+  const FONTW = { title: 400, label: 700, num: 400 };
+
+  const DURATION = 31.6; // last word ends 30.59 + ~1s
+
+  const ITEMS = (() => {
+    const items = [];
+    let auto = 100;
+    const line = (pts, role, w, a, b, opt = {}) => items.push({ k: 'line', pts, role, w, a, b, amp: opt.amp ?? 1.5, step: opt.step, seed: auto++ });
+    const text = (s, x, y, size, font, role, a, b, opt = {}) => items.push({ k: 'text', s, x, y, size, font, role, a, b, rot: opt.rot || 0, align: opt.align || 'left', seed: auto++ });
+    const dot = (x, y, r, role, a) => items.push({ k: 'dot', x, y, r, role, a, b: a + 0.05 });
+    const arrow = (pts, role, w, a, b, hl = 22) => {
+      line(pts, role, w, a, b);
+      line(head(pts, hl), role, w, b, b + 0.1);
+    };
+    const molecule = (x, y, a, role = 'ink', s = 1) => {
+      const r = H.rng('mol' + ((x * 7 + y * 13) | 0));
+      const o1 = r.range(-0.7, 0.7), o2 = r.range(-0.7, 0.7);
+      line(circ(x - 11 * s, y + o1, 8 * s, 8 * s, -1.3 + o1, -1.3 + o1 + 6.9), role, 3.4, a, a + 0.1);
+      line(circ(x + 11 * s, y + o2, 8 * s, 8 * s, 0.4 + o2, 0.4 + o2 + 6.9), role, 3.4, a + 0.05, a + 0.15);
+      line([[x - 4, y + o1 * 0.5], [x + 4, y + o2 * 0.5]], role, 3, a + 0.1, a + 0.17);
+    };
+    const sun = (x, y, r, role, a0, per, angles) => {
+      line(circ(x, y, r, r, -1.6, 5.2), role, 6, a0, a0 + per * 0.5);
+      const n = angles.length;
+      angles.forEach((an, i) => {
+        const c = Math.cos(an), s = Math.sin(an);
+        line([[x + c * (r + 7), y + s * (r + 7)], [x + c * (r + 26), y + s * (r + 26)]], role, 5, a0 + per * (0.5 + 0.5 * i / n), a0 + per * (0.5 + 0.5 * (i + 1) / n));
+      });
+    };
+    const eye = (x, y, a) => {
+      line(bez([x - 46, y], [x - 16, y - 30], [x + 16, y - 30], [x + 46, y]), 'ink', 6, a, a + 0.25);
+      line(bez([x + 46, y], [x + 16, y + 24], [x - 16, y + 24], [x - 46, y]), 'ink', 6, a + 0.2, a + 0.45);
+      line(circ(x, y - 3, 9, 9), 'ink', 5, a + 0.4, a + 0.55);
+    };
+    const scribble = (x0, y0, x1, y1, role, a0, a1, n, seedStr, wLo, wHi) => {
+      const r = H.rng(seedStr);
+      for (let i = 0; i < n; i++) {
+        const y = y0 + (y1 - y0) * (i + 0.35) / n + r.range(-4, 4);
+        const xs = x0 + r.range(0, 60), xe = x1 - r.range(0, 60);
+        line([[xs, y], [(xs + xe) / 2, y + r.range(-14, 14)], [xe, y + r.range(-10, 10)]], role, r.range(wLo, wHi),
+          a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n + 0.05, { amp: 2.4, step: 8 });
+      }
+    };
+
+    // ---------- BEAT 1 · 0.0–4.0 · hook: blue sky vs red sunset ----------
+    text('WHY IS THE SKY BLUE?', 640, 292, 74, 'title', 'ink', 0.05, 0.9, { align: 'center', rot: -0.012 });
+    line([[300, 326], [640, 318], [980, 314]], 'blue', 8, 0.85, 1.1);           // underline lands with the word "blue" (0.80)
+    line(rrect(185, 385, 405, 265, 26), 'blue', 7, 1.15, 1.45);                 // day-sky panel
+    line(rrect(190, 380, 397, 258, 24).map(([x, y]) => [x + 4, y - 3]), 'blue', 5, 1.45, 1.65);
+    text('blue', 385, 462, 42, 'label', 'blue', 1.55, 1.85, { align: 'center' });
+    sun(385, 555, 30, 'ink', 1.9, 0.45, [-2.9, -2.2, -1.5, -0.8, -0.15]);       // high sun
+    line([[250, 614], [380, 600], [520, 610]], 'blue', 12, 2.4, 2.75, { amp: 2.5 }); // blue sky wash
+    text('=', 660, 522, 64, 'title', 'ink', 2.3, 2.45, { align: 'center' });    // "same reason" (1.64–2.32)
+    line(rrect(735, 385, 405, 265, 26), 'red', 7, 2.5, 2.8);                    // sunset panel ("sunset" 2.54)
+    line(rrect(740, 380, 397, 258, 24).map(([x, y]) => [x + 4, y - 3]), 'red', 5, 2.8, 3.0);
+    line([[770, 600], [1110, 600]], 'ink', 4, 3.0, 3.15);                       // horizon inside panel
+    sun(935, 600, 30, 'orange', 3.1, 0.4, [-2.9, -2.3, -1.7, -1.0]);            // sun sitting on the horizon
+    scribble(780, 508, 1090, 552, 'orange', 3.25, 3.6, 2, 'hooko', 12, 16);
+    scribble(780, 548, 1090, 570, 'red', 3.4, 3.7, 2, 'hookr', 10, 14);
+    text('red', 935, 462, 42, 'label', 'red', 3.3, 3.65, { align: 'center' });  // "red." (3.34)
+    // hold 3.7–4.0
+
+    // ---------- BEAT 2 · 4.0–8.3 · sunlight is secretly a rainbow ----------
+    sun(1430, 490, 42, 'ink', 4.05, 0.55, [-2.8, -2.1, -1.4, -0.7, 0.0, 0.6]);  // "Sunlight" (4.30)
+    text('white light', 1430, 592, 36, 'label', 'ink', 5.0, 5.6, { align: 'center' }); // "white," (5.20)
+    line([[1476, 505], [1690, 612]], 'ink', 5, 5.6, 6.05);                      // the white ray
+    line([[1720, 690], [1830, 480], [1940, 690], [1726, 684]], 'ink', 6, 6.05, 6.4);  // prism ("it is" 6.06)
+    line([[1728, 684], [1836, 474], [1944, 684], [1734, 678]], 'ink', 4, 6.4, 6.62);
+    // rainbow fan, one band per marker color ("secretly a rainbow" 6.66–8.0)
+    [['red', 6.8], ['orange', 6.95], ['yellow', 7.1], ['green', 7.25], ['blue', 7.4], ['violet', 7.55]].forEach(([role, a], k) => {
+      line(bez([1900, 606], [2080, 580 + k * 34], [2200, 548 + k * 44], [2330, 494 + k * 58]), role, 9, a, a + 0.35, { amp: 1.1 });
+    });
+    text('a rainbow!', 2140, 880, 50, 'title', 'ink', 7.5, 8.1, { align: 'center', rot: -0.015 }); // "rainbow." (7.5)
+    // hold 8.1–8.3
+
+    // ---------- BEAT 3 · 8.45–13.1 · molecules scatter blue the most ----------
+    line([[2280, 520], [2560, 600]], 'ink', 5, 8.6, 9.3);                       // incoming light ("Air" 8.48)
+    const CL = [[2560, 740], [2620, 540], [2680, 690], [2760, 470], [2900, 560], [2960, 760], [3020, 480], [3040, 700]];
+    CL.forEach(([x, y], i) => molecule(x, y, 9.3 + i * 0.15));                  // "molecules," (9.80)
+    text('air molecules', 2800, 856, 38, 'label', 'ink', 10.5, 11.1, { align: 'center' });
+    molecule(2780, 610, 10.9, 'ink', 1.7);                                      // the one the light hits
+    [-2.6, -1.7, -0.8, 0.3, 1.2].forEach((an, i) => {                           // "scatter" (11.18) "blue" (11.64)
+      const c = Math.cos(an), s = Math.sin(an);
+      arrow([[2780 + c * 24, 610 + s * 24], [2780 + c * 144, 610 + s * 144]], 'blue', 7, 11.1 + i * 0.2, 11.35 + i * 0.2, 20);
+    });
+    { const c = Math.cos(-0.25), s = Math.sin(-0.25);                           // red scatters far less
+      line([[2780 + c * 24, 610 + s * 24], [2780 + c * 72, 610 + s * 72]], 'red', 5, 12.1, 12.35); }
+    text('blue', 2980, 428, 44, 'label', 'blue', 11.65, 12.0);
+    text('most!', 3105, 540, 64, 'num', 'ink', 12.4, 12.95, { rot: 0.02 });     // "most." (12.42)
+    // hold 12.95–13.1
+
+    // ---------- BEAT 4 · 13.1–18.0 · blue bounces everywhere, the sky glows blue ----------
+    const r4 = H.rng('bounce');
+    const M2 = [];
+    for (let i = 0; i < 12; i++) {
+      const x = 2400 + r4.range(0, 1140), y = 280 + r4.range(0, 500);
+      M2.push([x, y]);
+      molecule(x, y, 13.4 + i * 0.16);                                          // "bounces/everywhere" (13.90–15.16)
+    }
+    for (let i = 0; i < 10; i++) {                                              // blue arrows off every molecule
+      const [x, y] = M2[i], an = r4.range(-Math.PI, Math.PI), L = r4.range(85, 130);
+      const c = Math.cos(an), s = Math.sin(an);
+      arrow([[x + c * 20, y + s * 20], [x + c * (20 + L), y + s * (20 + L)]], 'blue', 6, 13.7 + i * 0.25, 13.95 + i * 0.25, 18);
+    }
+    line([[2040, 840], [3620, 840]], 'ink', 6, 15.5, 15.9);                     // ground
+    { // little person looking up
+      const x = 3120, g = 840, a = 16.0;
+      line(circ(x, g - 74, 20, 20, -1.2, 5.2), 'ink', 5, a, a + 0.15);
+      line([[x, g - 54], [x, g - 10]], 'ink', 5, a + 0.1, a + 0.2);
+      line([[x, g - 10], [x - 12, g]], 'ink', 5, a + 0.15, a + 0.25);
+      line([[x, g - 10], [x + 12, g]], 'ink', 5, a + 0.2, a + 0.3);
+      line([[x - 8, g - 44], [x - 24, g - 66]], 'ink', 4.5, a + 0.25, a + 0.33);
+      line([[x + 8, g - 44], [x + 24, g - 66]], 'ink', 4.5, a + 0.3, a + 0.38);
+      line([[x, g - 104], [x, g - 132]], 'ink', 3.5, a + 0.35, a + 0.42);
+      line(head([[x, g - 132], [x, g - 150]], 14), 'ink', 3.5, a + 0.42, a + 0.5);
+    }
+    scribble(2400, 255, 3580, 730, 'blue', 16.35, 17.75, 13, 'glow', 13, 20);   // the whole sky glows ("glows blue" 16.78–17.52)
+    text('glows blue', 2980, 205, 46, 'label', 'blue', 16.9, 17.5, { align: 'center', rot: -0.01 });
+    // hold 17.5–18.0
+
+    // ---------- BEAT 5 · 18.0–22.8 · at sunset, 10× more air ----------
+    line([[3540, 780], [4760, 780]], 'ink', 6, 18.8, 19.3);                     // horizon
+    sun(3650, 780, 48, 'orange', 18.9, 0.6, [-2.9, -2.3, -1.7, -1.0, -0.4]);    // setting sun ("sunset," 18.53)
+    eye(4690, 620, 19.5);                                                       // "you" on the right
+    const PATH = cubic([3690, 745], [4000, 690], [4330, 660], [4650, 640]);
+    line(PATH, 'ink', 6, 19.55, 20.45);                                         // "light crosses" (19.51)
+    const atU = (u) => PATH[Math.min(PATH.length - 1, Math.round(u * (PATH.length - 1)))];
+    [0.18, 0.34, 0.5, 0.66, 0.82].forEach((u, i) => { const [x, y] = atU(u); molecule(x, y, 20.9 + i * 0.18); });
+    { // the thick band of air, hatched
+      const r5 = H.rng('airband');
+      for (let i = 0; i < 18; i++) {
+        const x = 3800 + r5.range(0, 780), y = 500 + r5.range(0, 250);
+        line([[x, y], [x + 30, y - 18]], 'ink', 3, 20.5 + i * 0.05, 20.62 + i * 0.05, { amp: 0.8 });
+      }
+    }
+    text('10×', 4150, 380, 110, 'num', 'ink', 20.2, 20.8, { align: 'center' }); // "10" (20.37) — number lands as spoken
+    text('more air', 4150, 472, 44, 'label', 'ink', 21.2, 21.7, { align: 'center' }); // "more air" (21.15)
+    text('you', 4690, 812, 36, 'label', 'ink', 22.2, 22.5, { align: 'center' }); // "you." (22.27)
+    // hold 22.5–22.8
+
+    // ---------- BEAT 6 · 22.8–26.2 · blue is scattered away en route ----------
+    [0.3, 0.45, 0.6, 0.75].forEach((u, i) => {
+      const [x, y] = atU(u);                                                    // "scattered" (23.67) "away" (24.07)
+      arrow([[x, y], [x - 22, y - 48], [x - 64, y - 96]], 'blue', 7, 23.0 + i * 0.42, 23.3 + i * 0.42, 20);
+    });
+    text('blue scattered away', 4160, 295, 38, 'label', 'blue', 24.5, 25.4, { align: 'center' }); // "long before" (24.53)
+    // hold 25.4–26.2
+
+    // ---------- BEAT 7 · 26.2–29.8 · the red that survives is the sky ----------
+    line([[4290, 655], [4470, 650], [4648, 641]], 'red', 8, 26.5, 27.2);        // "red" (26.75)
+    arrow([[4648, 641], [4678, 632]], 'red', 7, 27.3, 27.5, 14);                // into the eye
+    [[4735, 588], [4745, 648], [4720, 700], [4655, 556]].forEach(([x, y], i) => dot(x, y, 5, 'red', 27.5 + i * 0.06));
+    text('red survives', 4430, 545, 44, 'label', 'red', 27.2, 27.9, { align: 'center' }); // "survives," (27.19)
+    line([[3600, 760], [4000, 754], [4720, 758]], 'red', 20, 28.0, 28.55, { amp: 2.6, step: 8 });     // sunset bands ("that is the sky" 28.35)
+    line([[3620, 722], [4100, 716], [4700, 720]], 'orange', 20, 28.35, 28.9, { amp: 2.6, step: 8 });
+    line([[3660, 688], [4150, 682], [4640, 686]], 'yellow', 16, 28.7, 29.3, { amp: 2.6, step: 8 });
+    line([[4380, 652], [4520, 646], [4645, 640]], 'red', 7, 29.35, 29.6);       // the surviving red re-scrawled over the wash
+    text('the sky', 3900, 505, 52, 'title', 'orange', 28.9, 29.5, { rot: -0.02 });
+    // hold 29.5–29.8
+
+    // ---------- BEAT 8 · 29.8–31.6 · takeaway: unfiltered ----------
+    line([[3790, 315], [4150, 380], [4520, 445]], 'ink', 10, 29.78, 29.93, { amp: 2.2, step: 6 }); // strike out the old number…
+    line([[4520, 318], [4150, 382], [3790, 448]], 'ink', 10, 29.84, 29.97, { amp: 2.2, step: 6 });
+    text('Unfiltered.', 4150, 400, 92, 'title', 'red', 29.95, 30.75, { align: 'center', rot: -0.008 }); // "unfiltered." (29.89)
+    line([[3800, 442], [4160, 434], [4520, 428]], 'red', 9, 30.85, 31.1);
+    // hold to 31.6
+
+    return items;
+  })();
+
+  // ---------- ghost of previous erased lessons (baked once, world space) ----------
+  let GHOST = null;
+  const ghostBoard = () => {
+    if (GHOST) return GHOST;
+    const x0 = -200, y0 = -150, w = 5100, h = 1500, s = 0.4;
+    const nz = H.makeNoise(23);
+    const g = H.layer(w * s, h * s), gc = g.getContext('2d');
+    gc.scale(s, s); gc.translate(-x0, -y0);
+    gc.strokeStyle = '#30343c'; gc.fillStyle = '#30343c'; gc.lineCap = 'round'; gc.lineJoin = 'round'; gc.lineWidth = 7;
+    const wl = (pts, sd, amp = 1.8) => { tracePath(gc, wobble(seg(pts), nz, sd, amp)); gc.stroke(); };
+    gc.font = '400 52px "Permanent Marker"'; gc.fillText('QUIZ FRI!', 700, 140);
+    gc.font = '700 34px "Kalam"'; gc.fillText('- waves ch 3', 720, 200); gc.fillText('- lab notes!', 720, 246);
+    wl([[690, 160], [1000, 156]], 1);
+    for (let i = 0; i <= 40; i++) { const x = 1250 + i * 9; gc.beginPath(); gc.moveTo(x, 330 + Math.sin(i / 4) * 26); gc.lineTo(x + 9, 330 + Math.sin((i + 1) / 4) * 26); gc.stroke(); }
+    gc.font = '400 44px "Permanent Marker"'; gc.fillText('f = ma', 1600, 1120);
+    wl([[1590, 1140], [1760, 1136]], 3, 1.4);
+    gc.beginPath(); gc.moveTo(2600, 1040); gc.lineTo(2720, 1040); gc.lineTo(2660, 940); gc.closePath(); gc.stroke();
+    gc.font = '700 30px "Kalam"'; gc.fillText('v²?', 2636, 1010);
+    gc.beginPath(); gc.arc(3900, 300, 66, 0, 7); gc.stroke();
+    gc.beginPath(); gc.moveTo(3900, 300); gc.lineTo(3900, 234); gc.moveTo(3900, 300); gc.lineTo(3956, 330); gc.stroke();
+    gc.beginPath(); gc.rect(4400, 180, 170, 90); gc.stroke();
+    gc.fillText('ch. 12', 4430, 240);
+    wl([[4330, 225], [4392, 226]], 5, 0.8);
+    // streaky eraser-wipe mask
+    const m = H.layer(w * s, h * s), mc = m.getContext('2d'), rm = H.rng(77);
+    mc.scale(s, s); mc.translate(-x0, -y0); mc.lineCap = 'round';
+    for (let i = 0; i < 260; i++) {
+      const y = rm.range(0, 1400), x = rm.range(-150, 4800), len = rm.range(150, 420);
+      mc.strokeStyle = `rgba(0,0,0,${rm.range(0.15, 0.8)})`; mc.lineWidth = rm.range(4, 26);
+      mc.beginPath(); mc.moveTo(x, y); mc.quadraticCurveTo(x + len / 2, y + rm.range(-30, 30), x + len, y + rm.range(-18, 18)); mc.stroke();
+    }
+    gc.setTransform(1, 0, 0, 1, 0, 0); gc.globalCompositeOperation = 'destination-in'; gc.drawImage(m, 0, 0);
+    const cv = H.layer(w * s, h * s), c = cv.getContext('2d');
+    c.filter = 'blur(0.5px)'; c.globalAlpha = 0.12; c.drawImage(g, 0, 0); c.globalAlpha = 1;
+    const rh = H.rng(78);
+    c.scale(s, s); c.translate(-x0, -y0); c.lineCap = 'round'; c.filter = 'blur(3px)';
+    [[900, 200, 200, 70], [1680, 1100, 180, 40], [3960, 320, 160, 60], [4480, 240, 120, 50], [2660, 990, 140, 50]].forEach(([cx, cy, rx, ry]) => {
+      for (let i = 0; i < 4; i++) {
+        const x = cx + rh.range(-rx, rx) * 0.6, y = cy + rh.range(-ry, ry);
+        c.strokeStyle = `rgba(120,128,135,${rh.range(0.014, 0.03)})`; c.lineWidth = rh.range(30, 60);
+        c.beginPath(); c.moveTo(x - 120, y); c.quadraticCurveTo(x, y + rh.range(-25, 25), x + 120, y + rh.range(-10, 10)); c.stroke();
+      }
+    });
+    GHOST = { cv, x0, y0, w, h };
+    return GHOST;
+  };
+
+  // ---------- camera ----------
+  const CAM = [
+    [0, 640, 380, 1.0], [3.85, 640, 380, 1.0],       // hook
+    [4.7, 1900, 620, 0.95], [8.0, 1900, 620, 0.95],  // prism
+    [8.45, 2780, 620, 0.95], [13.0, 2780, 620, 0.95],// molecules
+    [13.85, 2790, 560, 0.72], [17.9, 2790, 560, 0.72],// zoom out: whole sky
+    [18.75, 4150, 620, 0.95], [31.6, 4150, 620, 0.95],// sunset
+  ];
+
+  window.SB_drawFrame = function (ctx, W, H_, t) {
+    const nz = H.makeNoise(11);
+    const cam = camAt(CAM, t);
+    const apply = (c) => { c.translate(W / 2, H_ / 2); c.scale(cam[2], cam[2]); c.translate(-cam[0], -cam[1]); };
+    const toS = ([x, y]) => [(x - cam[0]) * cam[2] + W / 2, (y - cam[1]) * cam[2] + H_ / 2];
+
+    // board surface
+    const bg = ctx.createLinearGradient(0, 0, W, H_);
+    bg.addColorStop(0, '#f6f8f7'); bg.addColorStop(0.55, '#ecefee'); bg.addColorStop(1, '#dfe4e3');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H_);
+
+    ctx.save(); apply(ctx);
+    { // cleaner-residue blotches fixed to the board
+      const rb = H.rng(5);
+      for (let i = 0; i < 40; i++) {
+        const x = rb.range(-200, 4900), y = rb.range(-150, 1350), rr = rb.range(80, 260);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
+        g.addColorStop(0, `rgba(150,160,165,${rb.range(0.02, 0.045)})`); g.addColorStop(1, 'rgba(150,160,165,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+      }
+      const G = ghostBoard(); // ghost of old, half-erased lessons
+      ctx.drawImage(G.cv, G.x0, G.y0, G.w, G.h);
+    }
+
+    // the live diagram
+    const drawItem = (c, it) => {
+      const p = win(t, it.a, it.b);
+      if (p <= 0) return;
+      const col = COLS[it.role];
+      if (it.k === 'line') {
+        marker(c, wobble(seg(it.pts, it.step || 2.5), nz, it.seed % 97, it.amp), col, it.w, it.seed, p);
+      } else if (it.k === 'dot') {
+        c.fillStyle = H.rgba(col, 0.85); c.beginPath(); c.arc(it.x, it.y, it.r, 0, 7); c.fill();
+      } else {
+        const font = `${FONTW[it.font]} ${it.size}px ${FONTF[it.font]}`;
+        c.save(); c.font = font; const w = c.measureText(it.s).width; c.restore();
+        const x0 = it.align === 'center' ? it.x - w / 2 : it.x;
+        mText(c, it.s, x0, it.y, font, col, it.seed % 991, p, it.rot);
+      }
+    };
+    for (const it of ITEMS) drawItem(ctx, it);
+    ctx.restore();
+
+    // gloss / sheen (drifts with the camera)
+    const sh = ctx.createLinearGradient(220 - cam[0] * 0.06, -60, 760 - cam[0] * 0.06, 760);
+    sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.4, 'rgba(255,255,255,0)'); sh.addColorStop(0.46, 'rgba(255,255,255,0.22)');
+    sh.addColorStop(0.5, 'rgba(255,255,255,0.1)'); sh.addColorStop(0.53, 'rgba(255,255,255,0.24)'); sh.addColorStop(0.6, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H_);
+    { // ceiling lights slide by with parallax
+      const off = -(cam[0] - 640) * 0.15;
+      for (let i = 0; i < 4; i++) {
+        const x = 380 + i * 550 + off, rx = i % 2 ? 230 : 260, ry = i % 2 ? 22 : 26, y = i % 2 ? 66 : 70;
+        if (x + rx < 0 || x - rx > W) continue;
+        ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+        g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.5, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, 7); ctx.fill(); ctx.restore();
+      }
+      const fo = ctx.createLinearGradient(0, H_ - 240, 0, H_);
+      fo.addColorStop(0, 'rgba(60,70,80,0)'); fo.addColorStop(1, 'rgba(60,70,80,0.08)');
+      ctx.fillStyle = fo; ctx.fillRect(0, H_ - 240, W, 240);
+    }
+
+    // the marker in hand, tip on whatever is being drawn right now
+    const measure = (it, p) => {
+      ctx.save(); ctx.font = `${FONTW[it.font]} ${it.size}px ${FONTF[it.font]}`;
+      const w = ctx.measureText(it.s).width, x0 = it.align === 'center' ? it.x - w / 2 : it.x;
+      const w2 = ctx.measureText(it.s.slice(0, Math.ceil(it.s.length * p))).width; ctx.restore();
+      return [x0 + w2, it.y - it.size * 0.35];
+    };
+    let tip = null, tipRole = 'ink';
+    for (const it of ITEMS) {
+      if (it.k === 'dot') continue;
+      const p = win(t, it.a, it.b);
+      if (p > 0 && p < 1) {
+        tipRole = it.role;
+        tip = it.k === 'line' ? it.pts[Math.min(it.pts.length - 1, Math.floor(p * (it.pts.length - 1)))] : measure(it, p);
+      }
+    }
+    if (tip) {
+      const [tx, ty] = toS(tip), col = COLS[tipRole], ang = 0.95, len = 230;
+      ctx.save();
+      ctx.save(); ctx.filter = 'blur(8px)'; ctx.fillStyle = 'rgba(40,50,60,0.25)'; ctx.translate(tx + 14, ty + 18); ctx.rotate(ang); ctx.beginPath(); ctx.roundRect(8, -14, len, 28, 12); ctx.fill(); ctx.restore();
+      ctx.translate(tx, ty); ctx.rotate(ang);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-2, -3); ctx.lineTo(16, -6); ctx.lineTo(16, 6); ctx.lineTo(-2, 2); ctx.closePath(); ctx.fill();
+      const g = ctx.createLinearGradient(0, -14, 0, 14); g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, '#e4e6e8'); g.addColorStop(1, '#9ea3a8');
+      ctx.fillStyle = '#c9ccd0'; ctx.beginPath(); ctx.roundRect(14, -9, 20, 18, 4); ctx.fill();
+      ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(32, -14, len - 32, 28, 10); ctx.fill();
+      ctx.fillStyle = col; ctx.fillRect(len - 52, -14, 40, 28);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(40, -9, len - 100, 4);
+      ctx.fillStyle = H.rgba(col, 0.85); ctx.fillRect(70, -2, 60, 5);
+      ctx.restore();
+    }
+
+    H.grain(ctx, W, H_, 0.018, 9 + (Math.floor(t * 12) % 5));
+  };
+
+  window.SB_DURATION = DURATION;
+})();
+
+// ================= storyboard page =================
+const PANELS = [
+  {
+    n: 1, t: 3.7, from: '0:00.0', to: '0:04.0',
+    say: '“The sky is blue for the same reason the sunset is red.”',
+    on: '“WHY IS THE SKY BLUE?” (74px title) · “blue” · “=” · “red”',
+    how: 'Opening shot — the hook, drawn at the left end of the big board. Title writes 0.05–0.9 (the word “blue” lands at 0.80) and the blue underline lands with it; the day-sky panel + “blue” tag appear 0.95–1.85; “=” lands on “same reason” (2.3); the sunset panel, horizon sun and “red” tag follow the words “sunset” (2.54) and “red.” (3.34). Hold the finished comparison 3.7–4.0.',
+    sounds: 'cap-off pop (0.03) · a marker stroke per stroke {minor} · pops as “blue” / “=” / “red” land · no big hits — the hook line carries',
+  },
+  {
+    n: 2, t: 8.2, from: '0:04.0', to: '0:08.3',
+    say: '“Sunlight looks white, but it is secretly a rainbow.”',
+    on: '“white light” · “a rainbow!”',
+    how: 'CONTINUOUS — camera pans right along the board (3.85–4.7s, in the breath after “red.”); the hook stays behind. The sun from the hook becomes the white-light source: sun + rays at 4.05 (“Sunlight” 4.30), “white light” label at 5.0 (“white,” 5.20), white ray into a double-traced prism at 6.05, then six marker-colored bands fan out one by one through 6.8–7.9 as “secretly a rainbow” is said; “a rainbow!” writes at 7.5.',
+    sounds: 'pan whoosh (3.85–4.7) · marker strokes {minor} · sparkle as the bands fan (6.8–7.9) · pop on “a rainbow!”',
+  },
+  {
+    n: 3, t: 12.9, from: '0:08.45', to: '0:13.1',
+    say: '“Air is made of tiny molecules, and they scatter blue light the most.”',
+    on: '“air molecules” · “blue” · “most!”',
+    how: 'CONTINUOUS — camera pans right again (8.0–8.45s). The white ray’s far end becomes the story: an incoming light ray (8.6), then eight tiny two-atom molecules appear one at a time with “tiny molecules” (9.3–10.5); “air molecules” label at 10.5. The molecule the light hits gets five long blue arrows flung in all directions with “scatter blue” (11.1–12.1) plus one short red arrow for contrast, and the big “most!” lands exactly on “most.” (12.42).',
+    sounds: 'pan whoosh (8.0–8.45) · marker strokes {minor} · tick per scatter arrow · pop on “most!”',
+  },
+  {
+    n: 4, t: 17.6, from: '0:13.1', to: '0:18.0',
+    say: '“So blue bounces everywhere, and the whole sky glows blue.”',
+    on: '“glows blue”',
+    how: 'CONTINUOUS ZOOM-OUT of the same scene (13.0–13.85s) — the single molecule becomes a whole sky of them: 12 more molecules pop in across the region (13.4–15.3, “everywhere” 14.64), blue arrows bounce off ten of them in every direction (13.7–16.2, “bounces” 13.90), a ground line + a little person looking up appear (15.5–16.5), then wide blue marker scribbles wash the whole sky blue with “glows blue” (16.35–17.75) and the label lands on the words (16.9).',
+    sounds: 'zoom-out whoosh (13.0–13.85) · marker strokes + ticks {minor} · swish as the blue wash fills · pop on “glows blue”',
+  },
+  {
+    n: 5, t: 22.6, from: '0:18.0', to: '0:22.8',
+    say: '“But at sunset, light crosses ten times more air to reach you.”',
+    on: '“10×” (110px) · “more air” · “you”',
+    how: 'SCENE CHANGE — a long pan across the board (17.9–18.75s, in the sentence gap) into fresh space: day → sunset is a jump in time and place, and the glowing blue sky stays behind on the board. Horizon + setting half-sun draw with “sunset,” (18.8–19.5); an almond eye waits on the right; the light’s long curved path draws with “light crosses” (19.55–20.45); the air band hatches in; “10×” lands on “ten” (20.37) and “more air” on the words (21.2); molecules appear along the path; “you” tags the eye at 22.2.',
+    sounds: 'big pan whoosh (17.9–18.75) · marker strokes {minor} · impact + ding as “10×” lands (20.6) · pop on “you”',
+  },
+  {
+    n: 6, t: 25.9, from: '0:22.8', to: '0:26.2',
+    say: '“The blue gets scattered away long before it gets there.”',
+    on: '“blue scattered away”',
+    how: 'SAME SHOT, no camera move — the path already on screen keeps telling the story: at four molecules along the path, blue arrows peel off sideways/away (23.0–24.6, timed to “scattered away” 23.67–24.33) while the path itself continues; the label “blue scattered away” writes as “long before it gets there” is said (24.5–25.4). The eye is now visibly out of blue’s reach. Hold 25.4–26.2.',
+    sounds: 'marker strokes {minor} · swish per deflecting arrow · pop on the label',
+  },
+  {
+    n: 7, t: 29.7, from: '0:26.2', to: '0:29.8',
+    say: '“And the red that survives? That is the sky.”',
+    on: '“red survives” · “the sky”',
+    how: 'SAME SHOT — the surviving end of the path is re-traced in red straight into the eye (26.5–27.2, “red” 26.75), a red arrowhead + sparks hit the eye (27.3–27.7) and “red survives” lands with “survives,” (27.19). Then the answer draws itself: red/orange/yellow marker bands wash across the sky above the horizon (28.0–29.3, “that is the sky” 28.35–29.37) and “the sky” labels them at 28.9; at 29.35 the surviving red is re-scrawled over the wash so the path into the eye stays readable.',
+    sounds: 'marker strokes {minor} · success ding as red reaches the eye (27.4) · pop on “the sky”',
+  },
+  {
+    n: 8, t: 31.4, from: '0:29.8', to: '0:31.6',
+    say: '“Unfiltered.”',
+    on: '“Unfiltered.” (92px, red)',
+    how: 'SAME SHOT, takeaway only — the old “10×” figure is struck out with two hard ink X-strokes (29.78–29.97, the medium’s way of replacing a number), then “Unfiltered.” is re-scrawled in big red marker in its place, underlined in red at 30.85; the frame holds to 31.6 (last word ends 30.59 + ~1s).',
+    sounds: 'big marker stroke on “Unfiltered.” · impact as it lands (29.95) · final ding (31.1)',
+  },
+];
+
+const ASSUMPTIONS = [
+  'Timing: word times are from WORDS.tsv (a word-level alignment of the attached VO.wav, 30.61 s). Your line table and the take agree within ±0.4 s; I trusted the take, so e.g. beat 5 starts at the real “But” (18.17). Last word ends at 30.59 s → DURATION = 31.6 s.',
+  'Blue vs red scattering is drawn qualitatively: blue arrows ≈ 2× longer and thicker than the one red arrow. Physically Rayleigh scattering goes as 1/λ⁴ (blue 450 nm scatters ~4–5× more than red 650 nm); no number is put on screen because the script gives none.',
+  '“10×” more air follows the narration. (A real sunset path is ~38× airmass at the horizon; I show the script’s number, not mine.)',
+  'Molecules are generic two-atom pairs as stand-ins for N₂/O₂; the “band of air” at sunset is light hatching, not to scale.',
+  'The prism and rainbow are schematic: six marker colors with indigo merged into violet, fanning at an exaggerated angle.',
+  '“White light” is drawn in black ink and labeled, because a white marker wouldn’t read on a whiteboard.',
+  'Sunset sky is drawn as red → orange → yellow marker bands near the horizon (a stylized sunset gradient), and the person/“you” is a stick figure + almond eye.',
+  'No eraser pass in this piece: all four scenes live on one big board and scene changes are camera pans/zooms (the reference’s camera-follow). The board carries faint ghost residue of unrelated erased lessons (“QUIZ FRI!”, “f = ma”, a pie) purely for texture.',
+  'Sound design (final build): every draw-on gets a marker stroke of matching length, minor-tagged so voiceover mode ducks them ~60%; big hits (the “10×” impact+ding, “Unfiltered.”) sit on stressed words or pauses at full volume.',
+];
+
+(async () => {
+  await Promise.all([
+    '400 66px "Permanent Marker"', '700 38px "Kalam"', '400 40px "Permanent Marker"',
+  ].map((f) => document.fonts.load(f, 'AaZz09!×?')));
+  await document.fonts.ready;
+
+  const grid = document.getElementById('grid');
+  for (const P of PANELS) {
+    const card = document.createElement('div'); card.className = 'card';
+    const cv = document.createElement('canvas'); cv.width = 1280; cv.height = 720;
+    card.appendChild(cv);
+    const t0 = performance.now();
+    window.SB_drawFrame(cv.getContext('2d'), 1280, 720, P.t);
+    const ms = Math.round(performance.now() - t0);
+    card.insertAdjacentHTML('beforeend', `
+      <div class="beatline">Beat ${P.n} · <b>${P.from} → ${P.to}</b> · frame ${ms} ms</div>
+      <div class="row say">${P.say}</div>
+      <div class="row"><b>On screen:</b> ${P.on}</div>
+      <div class="row"><b>How it gets there:</b> ${P.how}</div>
+      <div class="row"><b>Key sounds:</b> ${P.sounds}</div>`);
+    grid.appendChild(card);
+  }
+  document.getElementById('assum').innerHTML = ASSUMPTIONS.map((a) => `<li>${a}</li>`).join('');
+})();
+</script>
+</body>
+</html>
