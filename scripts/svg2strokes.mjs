@@ -152,7 +152,7 @@ function parseSvg(text) {
       if (d) pts = flattenPath(d);
     } else if (tag === 'circle' || tag === 'ellipse') {
       const cx = +attrs.match(/cx="([-\d.]+)"/)?.[1], cy = +attrs.match(/cy="([-\d.]+)"/)?.[1];
-      const rx = +attrs.match(/r="([-\d.]+)"/ || attrs.match(/rx="([-\d.]+)"/))?.[1];
+      const rx = +(attrs.match(/r="([-\d.]+)"/) || attrs.match(/rx="([-\d.]+)"/))?.[1];
       const ry = tag === 'circle' ? rx : +attrs.match(/ry="([-\d.]+)"/)?.[1];
       pts = [];
       for (let a = 0; a <= 64; a++) pts.push([cx + rx * Math.cos(a / 64 * 2 * Math.PI), cy + ry * Math.sin(a / 64 * 2 * Math.PI)]);
